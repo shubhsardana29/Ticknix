@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["ticket", "event", "auth", "payment"]
+}
+
+model Ticket {
+  id           Int          @id @default(autoincrement())
+  eventId      Int
+  ticketTypeId Int
+  sellerId     Int
+  buyerId      Int?
+  price        Decimal      @db.Decimal(10, 2)
+  status       TicketStatus @default(AVAILABLE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  transaction  Transaction?
+  buyer        User?        @relation("BuyerTickets", fields: [buyerId], references: [id])
+  event        Event        @relation(fields: [eventId], references: [id])
+  seller       User         @relation("SellerTickets", fields: [sellerId], references: [id])
+  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id])
+
+  @@schema("ticket")
+}
+
+model Event {
+  id            Int          @id @default(autoincrement())
+  name          String
+  date          DateTime
+  time          DateTime
+  venue         String
+  city          String
+  totalCapacity Int
+  basePrice     Decimal      @db.Decimal(10, 2)
+  gstRate       Decimal      @db.Decimal(5, 2)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  ticketTypes   TicketType[]
+  tickets       Ticket[]
+
+  @@schema("event")
+}
+
+model TicketType {
+  id       Int      @id @default(autoincrement())
+  eventId  Int
+  name     String
+  minPrice Decimal  @db.Decimal(10, 2)
+  capacity Int
+  event    Event    @relation(fields: [eventId], references: [id])
+  tickets  Ticket[]
+
+  @@schema("event")
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  boughtTickets Ticket[] @relation("BuyerTickets")
+  soldTickets   Ticket[] @relation("SellerTickets")
+
+  @@schema("auth")
+}
+
+enum TicketStatus {
+  AVAILABLE
+  SOLD
+  CANCELLED
+
+  @@schema("ticket")
+}
+
+model Transaction {
+  id       Int    @id @default(autoincrement())
+  ticketId Int    @unique
+  ticket   Ticket @relation(fields: [ticketId], references: [id])
+
+  @@schema("payment")
+}

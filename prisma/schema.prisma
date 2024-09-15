@@ -1,0 +1,117 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["auth", "event", "payment", "ticket"]
+}
+
+model User {
+  id                 Int           @id @default(autoincrement())
+  name               String
+  email              String        @unique
+  passwordHash       String
+  phone              String?
+  role               Role          @default(USER)
+  panNumber          String?       @unique
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  boughtTransactions Transaction[] @relation("BuyerTransactions")
+  soldTransactions   Transaction[] @relation("SellerTransactions")
+  boughtTickets      Ticket[]      @relation("BuyerTickets")
+  soldTickets        Ticket[]      @relation("SellerTickets")
+
+  @@schema("auth")
+}
+
+model Event {
+  id            Int          @id @default(autoincrement())
+  name          String
+  date          DateTime
+  time          DateTime
+  venue         String
+  city          String
+  totalCapacity Int
+  basePrice     Decimal      @db.Decimal(10, 2)
+  gstRate       Decimal      @db.Decimal(5, 2)
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  ticketTypes   TicketType[]
+  tickets       Ticket[]
+
+  @@schema("event")
+}
+
+model TicketType {
+  id       Int      @id @default(autoincrement())
+  eventId  Int
+  name     String
+  minPrice Decimal  @db.Decimal(10, 2)
+  capacity Int
+  event    Event    @relation(fields: [eventId], references: [id])
+  tickets  Ticket[]
+
+  @@schema("event")
+}
+
+model Ticket {
+  id           Int          @id @default(autoincrement())
+  eventId      Int
+  ticketTypeId Int
+  sellerId     Int
+  buyerId      Int?
+  price        Decimal      @db.Decimal(10, 2)
+  status       TicketStatus @default(AVAILABLE)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  transaction  Transaction?
+  buyer        User?        @relation("BuyerTickets", fields: [buyerId], references: [id])
+  event        Event        @relation(fields: [eventId], references: [id])
+  seller       User         @relation("SellerTickets", fields: [sellerId], references: [id])
+  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id])
+
+  @@schema("ticket")
+}
+
+model Transaction {
+  id        Int               @id @default(autoincrement())
+  ticketId  Int               @unique
+  buyerId   Int
+  sellerId  Int
+  amount    Decimal           @db.Decimal(10, 2)
+  gstAmount Decimal           @db.Decimal(10, 2)
+  status    TransactionStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  buyer     User              @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  seller    User              @relation("SellerTransactions", fields: [sellerId], references: [id])
+  ticket    Ticket            @relation(fields: [ticketId], references: [id])
+
+  @@schema("payment")
+}
+
+enum Role {
+  USER
+  ADMIN
+
+  @@schema("auth")
+}
+
+enum TicketStatus {
+  AVAILABLE
+  SOLD
+  CANCELLED
+
+  @@schema("ticket")
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+
+  @@schema("payment")
+}
